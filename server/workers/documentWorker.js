@@ -28,6 +28,15 @@ const worker = new Worker(
         job.data.fileName
       );
 
+      await Document.findByIdAndUpdate(
+
+        job.data.documentId,
+
+        {
+          status: "processing",
+        }
+      );
+
       // OCR
       const text =
         await extractTextFromImage(
@@ -49,22 +58,27 @@ const worker = new Worker(
         extractStructuredData(cleanText);
 
       // Save to Mongo
-      const savedDocument =
-        await Document.create({
+      const updatedDocument =
+        await Document.findByIdAndUpdate(
 
-          fileName: job.data.fileName,
+          job.data.documentId,
 
-          type: classification.type,
+          {
+            type: classification.type,
 
-          confidence:
-            classification.confidence,
+            confidence:
+              classification.confidence,
 
-          scores: classification.scores,
+            scores:
+              classification.scores,
 
-          cleanText,
+            cleanText,
 
-          extractedData,
-        });
+            extractedData,
+
+            status: "completed",
+          }
+        );
 
       console.log(
         "✅ Saved To Mongo:",
@@ -73,16 +87,21 @@ const worker = new Worker(
 
     } catch (error) {
 
-      console.error(
-        "❌ Worker Error:",
-        error
-      );
-    }
-  },
+        console.error(
+          "❌ Worker Error:",
+          error
+        );
 
-  {
-    connection: redisConnection,
-  }
-);
+        if (job?.data?.documentId) {
 
-console.log("🚀 Worker started");
+          await Document.findByIdAndUpdate(
+
+            job.data.documentId,
+
+            {
+              status: "failed",
+            }
+          );
+        }
+      }
+    });

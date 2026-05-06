@@ -20,25 +20,56 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.post("/", upload.array("files", 10), async (req, res) => {
+
   try {
+
     const files = req.files;
+
+    if (!files || !files.length) {
+
+      return res.status(400).json({
+        error: "No files uploaded",
+      });
+    }
 
     for (let file of files) {
 
-      // 🚀 ADD JOB TO QUEUE
-      await documentQueue.add("process-document", {
-        fileName: file.filename,
-        filePath: file.path,
-      });
+      // 🟡 Create queued document first
+      const savedDocument =
+        await Document.create({
 
-      console.log("✅ Job Added:", file.filename);
+          fileName: file.filename,
+
+          status: "queued",
+        });
+
+      // 🚀 Add processing job
+      await documentQueue.add(
+
+        "process-document",
+
+        {
+          documentId: savedDocument._id,
+
+          fileName: file.filename,
+
+          filePath: file.path,
+        }
+      );
+
+      console.log(
+        "✅ Job Added:",
+        file.filename
+      );
     }
 
     res.json({
-      message: "Files added to processing queue",
+      message:
+        "Files added to processing queue",
     });
 
   } catch (error) {
+
     console.error(error);
 
     res.status(500).json({

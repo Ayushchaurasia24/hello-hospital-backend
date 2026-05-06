@@ -12,6 +12,17 @@ const documentSchema = new mongoose.Schema(
 
     cleanText: String,
 
+    status: {
+      type: String,
+      enum: [
+        "queued",
+        "processing",
+        "completed",
+        "failed",
+      ],
+      default: "queued",
+    },
+
     extractedData: {
       patientName: String,
       date: String,
