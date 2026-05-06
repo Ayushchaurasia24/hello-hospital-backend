@@ -3,6 +3,7 @@ import multer from "multer";
 import { extractTextFromImage } from "../services/ocrService.js";
 import { classifyDocument } from "../services/classifyService.js";
 import { extractStructuredData } from "../services/extractService.js";
+import Document from "../models/Document.js";
 const router = express.Router();
 
 const storage = multer.diskStorage({
@@ -34,12 +35,21 @@ router.post("/", upload.array("files", 10), async (req, res) => {
 
       const extractedData = extractStructuredData(cleanText);
 
-      results.push({
+      const savedDocument = await Document.create({
         fileName: file.filename,
-        ...classification,
-        extractedData, // 🔥 NEW
+
+        type: classification.type,
+
+        confidence: classification.confidence,
+
+        scores: classification.scores,
+
         cleanText,
+
+        extractedData,
       });
+
+      results.push(savedDocument);
     }
 
     res.json({
