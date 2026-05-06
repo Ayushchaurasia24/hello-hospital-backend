@@ -4,6 +4,8 @@ import { extractTextFromImage } from "../services/ocrService.js";
 import { classifyDocument } from "../services/classifyService.js";
 import { extractStructuredData } from "../services/extractService.js";
 import Document from "../models/Document.js";
+import documentQueue from "../queues/documentQueue.js";
+
 const router = express.Router();
 
 const storage = multer.diskStorage({
@@ -21,44 +23,27 @@ router.post("/", upload.array("files", 10), async (req, res) => {
   try {
     const files = req.files;
 
-    let results = [];
-
     for (let file of files) {
-      const text = await extractTextFromImage(file.path);
 
-      const cleanText = text
-        .replace(/[^a-zA-Z0-9\s.:]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      const classification = classifyDocument(cleanText);
-
-      const extractedData = extractStructuredData(cleanText);
-
-      const savedDocument = await Document.create({
+      // 🚀 ADD JOB TO QUEUE
+      await documentQueue.add("process-document", {
         fileName: file.filename,
-
-        type: classification.type,
-
-        confidence: classification.confidence,
-
-        scores: classification.scores,
-
-        cleanText,
-
-        extractedData,
+        filePath: file.path,
       });
 
-      results.push(savedDocument);
+      console.log("✅ Job Added:", file.filename);
     }
 
     res.json({
-      message: "Files processed successfully",
-      results,
+      message: "Files added to processing queue",
     });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+
+    res.status(500).json({
+      error: error.message,
+    });
   }
 });
 
