@@ -32,6 +32,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
       });
     }
 
+    const uploadedDocuments = [];
     for (let file of files) {
 
       // 🟡 Create queued document first
@@ -43,6 +44,9 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           status: "queued",
         });
 
+      uploadedDocuments.push(
+        savedDocument._id.toString()
+      );
       // 🚀 Add processing job
       await documentQueue.add(
 
@@ -64,8 +68,12 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     }
 
     res.json({
+
       message:
         "Files added to processing queue",
+
+      uploadedDocumentIds:
+        uploadedDocuments,
     });
 
   } catch (error) {
