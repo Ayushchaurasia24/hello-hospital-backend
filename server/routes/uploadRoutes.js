@@ -98,4 +98,59 @@ router.get("/documents", async (req, res) => {
   }
 });
 
+router.post("/retry/:id", async (req, res) => {
+
+  try {
+
+    const document =
+      await Document.findById(
+        req.params.id
+      );
+
+    if (!document) {
+
+      return res.status(404).json({
+        error: "Document not found",
+      });
+    }
+
+    // 🟡 Reset status
+    document.status = "queued";
+
+    await document.save();
+
+    // 🚀 Re-add to queue
+    await documentQueue.add(
+
+      "process-document",
+
+      {
+        documentId: document._id,
+
+        fileName: document.fileName,
+
+        filePath:
+          `server/uploads/${document.fileName}`,
+      }
+    );
+
+    console.log(
+      "🔄 Retry Added:",
+      document.fileName
+    );
+
+    res.json({
+      message:
+        "Retry job added successfully",
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+});
 export default router;

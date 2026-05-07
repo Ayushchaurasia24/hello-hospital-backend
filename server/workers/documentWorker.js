@@ -12,9 +12,10 @@ import { extractStructuredData } from "../services/extractService.js";
 
 import Document from "../models/Document.js";
 
-// 🚀 Connect MongoDB
+// ================= DB CONNECT =================
 connectDB();
 
+// ================= WORKER =================
 const worker = new Worker(
 
   "document-processing",
@@ -28,6 +29,7 @@ const worker = new Worker(
         job.data.fileName
       );
 
+      // 🟡 Mark Processing
       await Document.findByIdAndUpdate(
 
         job.data.documentId,
@@ -37,27 +39,27 @@ const worker = new Worker(
         }
       );
 
-      // OCR
+      // ================= OCR =================
       const text =
         await extractTextFromImage(
           job.data.filePath
         );
 
-      // Clean text
+      // ================= CLEAN TEXT =================
       const cleanText = text
         .replace(/[^a-zA-Z0-9\s.:]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
 
-      // Classification
+      // ================= CLASSIFICATION =================
       const classification =
         classifyDocument(cleanText);
 
-      // Structured extraction
+      // ================= STRUCTURED EXTRACTION =================
       const extractedData =
         extractStructuredData(cleanText);
 
-      // Save to Mongo
+      // ================= UPDATE DOC =================
       const updatedDocument =
         await Document.findByIdAndUpdate(
 
@@ -77,31 +79,44 @@ const worker = new Worker(
             extractedData,
 
             status: "completed",
+          },
+
+          {
+            new: true,
           }
         );
 
       console.log(
-        "✅ Saved To Mongo:",
-        savedDocument._id
+        "✅ Saved:",
+        updatedDocument._id
       );
 
     } catch (error) {
 
-        console.error(
-          "❌ Worker Error:",
-          error
+      console.error(
+        "❌ Worker Error:",
+        error
+      );
+
+      // 🔴 Mark Failed
+      if (job?.data?.documentId) {
+
+        await Document.findByIdAndUpdate(
+
+          job.data.documentId,
+
+          {
+            status: "failed",
+          }
         );
-
-        if (job?.data?.documentId) {
-
-          await Document.findByIdAndUpdate(
-
-            job.data.documentId,
-
-            {
-              status: "failed",
-            }
-          );
-        }
       }
-    });
+    }
+  },
+
+  // ================= REDIS =================
+  {
+    connection: redisConnection,
+  }
+);
+
+console.log("🚀 Worker started");
